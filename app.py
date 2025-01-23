@@ -81,7 +81,9 @@ def redshift_connection(dbname, user, password, host, port):
     return decorator
 
 query = '''
-
+select buid,bid,fad_ad_account_id,fad_campaign_id,fad_adset_id,fad_ad_id,fc_picture,fad_preview_shareable_link,fad_status,fad_effective_status,fad_ad_review_feedback,fcd_objective
+from
+(
 SELECT fad.ad_account_id as fad_ad_account_id,fad.campaign_id as fad_campaign_id,fad.adset_id as fad_adset_id,fad.ad_id as fad_ad_id,
 fad.name as fad_name,fad.status as fad_status,fad.effective_status as fad_effective_status,fad.adcreative_id as fad_adcreative_id,
 fad.preview_shareable_link as fad_preview_shareable_link,fad.ad_review_feedback as fad_ad_review_feedback,fad.created_date as fad_created_date,
@@ -92,7 +94,7 @@ facd.title as facd_title,facd.message as facd_message,facd.status as facd_status
 facd.image_url as facd_image_url,facd.object_story_spec as facd_object_story_spec,facd.degrees_of_freedom_spec as facd_degrees_of_freedom_spec,
 facd.thumbnail_id as facd_thumbnail_id,facd.thumbnail_url as facd_thumbnail_url,facd.video_id as facd_video_id,facd.updated_at as facd_updated_at,
 facd.asset_feed_spec as facd_asset_feed_spec,fc.id as fc_id,fc.creative_id as fc_creative_id,fc.creative_name as fc_creative_name,fc.ad_id as fc_ad_id,
-fc.page_id as fc_page_id,fc.picture as fc_picture, fcd.objective as camp_objective ,fc.message as fc_message,fc.created_at as fc_created_at,fc.updated_at as fc_updated_at,fc.video_id as fc_video_id,
+fc.page_id as fc_page_id,fc.picture as fc_picture,fc.message as fc_message,fc.created_at as fc_created_at,fc.updated_at as fc_updated_at,fc.video_id as fc_video_id,
 fc.video_url as fc_video_url,fc.headline as fc_headline,fc.image_hash as fc_image_hash,fc.thumbnail as fc_thumbnail,fc.app_creative_id as fc_app_creative_id,
 fc.object_story_id as fc_object_story_id,fc.instagram_user_id as fc_instagram_user_id,fc.instagram_media_id as fc_instagram_media_id,fc.product_set_id as fc_product_set_id,
 far.id as far_id,far.object_id as far_object_id,far.level as far_level,far.error_code as far_error_code,far.error_summary as far_error_summary,
@@ -100,7 +102,8 @@ far.error_message as far_error_message,far.created_at as far_created_at,far.upda
 far.status as far_status ,
 fcd.name as fcd_name,fcd.status as fcd_status,fcd.effective_status as fcd_effective_status,fcd.objective as fcd_objective,
 fcd.special_ad_categories as fcd_special_ad_categories,fcd.special_ad_category as fcd_special_ad_category,
-fcd.buying_type as fcd_buying_type,fcd.created_date as fcd_created_date,fcd.edited_at as fcd_edited_at,fcd.updated_at as fcd_updated_at
+fcd.buying_type as fcd_buying_type,fcd.created_date as fcd_created_date,fcd.edited_at as fcd_edited_at,fcd.updated_at as fcd_updated_at,
+bp.buid,bp.id as bid
 from zocket_global.fb_ads_details_v3 fad
 left JOIN zocket_global.fb_adcreative_details_v3 facd ON facd.adcreative_id = fad.adcreative_id
 LEFT JOIN zocket_global.fb_ads fa ON fa.ad_id = fad.ad_id
@@ -108,9 +111,19 @@ LEFT JOIN zocket_global.fb_creatives fc ON fa.id = fc.ad_id
 left join (SELECT * from zocket_global.fb_ad_reviews
 where level ='AD')far on fad.ad_id= far.object_id
 left join zocket_global.fb_campaign_details_v3 fcd on fad.campaign_id=fcd.campaign_id
+left join zocket_global.fb_child_ad_accounts child_acc on fad.ad_account_id=child_acc.ad_account_id
+left join zocket_global.fb_child_business_managers fcbm on child_acc.app_business_manager_id=fcbm.id
+left join 
+    (SELECT
+    id ,name,brand_name,json_extract_path_text(json_extract_array_element_text(business_user_ids, 0), 'role') AS role,
+    json_extract_path_text(json_extract_array_element_text(business_user_ids, 0), 'business_user_id') AS buid
+FROM
+    zocket_global.business_profile
+WHERE
+    json_extract_path_text(json_extract_array_element_text(business_user_ids, 0), 'role') = 'owner' )bp on fcbm.app_business_id=bp.id
 where fad.ad_account_id in (SELECT distinct ad_account_id from zocket_global.fb_child_ad_accounts)
-and fad.created_date>=current_date-30
-
+and fad.created_date>=current_date-90
+)
     '''
 
 
@@ -150,3 +163,58 @@ st.data_editor(
 ad_id = st.text_input("Enter ad_id")
 
 st.dataframe(df[df["fad_ad_id"] == ad_id])
+
+filtered_df = df[['buid','bid','fad_ad_account_id','fad_campaign_id','fad_adset_id','fad_ad_id','fc_picture','fad_preview_shareable_link','fad_status','fad_effective_status','fad_ad_review_feedback','fcd_objective']]
+
+
+# Function to extract both components
+def extract_components(json_string):
+    if json_string is None:
+        return None, None  # Handle None values gracefully
+    try:
+        # Parse the JSON string
+        parsed = json.loads(json_string)
+        global_value = parsed.get('global', '')
+        
+        # Extract the key and message from the global value
+        if '=' in global_value:
+            key, message = global_value.split('=', 1)
+            return key.strip(), message.strip()
+        else:
+            return None, None  # If '=' is not present
+    except (json.JSONDecodeError, KeyError, ValueError):
+        return None, None  # Handle any errors gracefully
+
+# Apply the function to extract key and message
+filtered_df[['Error', 'message']] = filtered_df['fad_ad_review_feedback'].apply(
+    lambda x: pd.Series(extract_components(x))
+)
+filtered_df['Error'] = filtered_df['Error'].str.replace(r'[0-9\(\)\[\]\.{}]', '', regex=True)
+
+st.dataframe(filtered_df)
+
+filtered_df = filtered_df[['buid','bid','fad_ad_account_id','fad_ad_id','fc_picture','fad_preview_shareable_link','fad_status','fad_effective_status','fad_ad_review_feedback','fcd_objective','Error','message']]
+
+st.data_editor(
+    filtered_df,
+    column_config={
+        "fc_picture": st.column_config.ImageColumn(
+            "Preview Image", help="Streamlit app preview screenshots"
+        ),
+        "fad_preview_shareable_link": st.column_config.LinkColumn(
+            "AD Preview",
+            help="View the AD preview in Facebook"
+        )
+        
+    },
+    hide_index=True,
+)
+
+grouped_df = filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount')
+
+st.dataframe(filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount'))
+
+
+st.dataframe(filtered_df[filtered_df['Error'].notna()].groupby(['buid', 'fad_ad_account_id']).size().reset_index(name='ErrorCount'))
+
+st.dataframe(filtered_df[filtered_df['Error'].notna()].groupby(['buid']).size().reset_index(name='ErrorCount'))
