@@ -129,8 +129,8 @@ df = execute_query(query=query)
 
 # st.dataframe(df, use_container_width=True)
 
-st.write(df.columns)
-st.dataframe(df)
+# st.write(df.columns)
+# st.dataframe(df)
 
 st.data_editor(
     df,
