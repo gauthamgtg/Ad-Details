@@ -81,7 +81,7 @@ def redshift_connection(dbname, user, password, host, port):
     return decorator
 
 query = '''
-select buid,bid,fad_ad_account_id,fad_campaign_id,fad_adset_id,fad_ad_id,fc_picture,fad_preview_shareable_link,fad_status,fad_effective_status,fad_ad_review_feedback,fcd_objective
+select buid,bid,fad_ad_account_id,fad_campaign_id,fad_adset_id,fad_ad_id,fc_picture,fad_preview_shareable_link,fad_status,fad_effective_status,fad_ad_review_feedback,fcd_objective,business_manager_id
 from
 (
 SELECT fad.ad_account_id as fad_ad_account_id,fad.campaign_id as fad_campaign_id,fad.adset_id as fad_adset_id,fad.ad_id as fad_ad_id,
@@ -103,7 +103,7 @@ far.status as far_status ,
 fcd.name as fcd_name,fcd.status as fcd_status,fcd.effective_status as fcd_effective_status,fcd.objective as fcd_objective,
 fcd.special_ad_categories as fcd_special_ad_categories,fcd.special_ad_category as fcd_special_ad_category,
 fcd.buying_type as fcd_buying_type,fcd.created_date as fcd_created_date,fcd.edited_at as fcd_edited_at,fcd.updated_at as fcd_updated_at,
-bp.buid,bp.id as bid
+bp.buid,bp.id as bid, fcbm.business_manager_id
 from zocket_global.fb_ads_details_v3 fad
 left JOIN zocket_global.fb_adcreative_details_v3 facd ON facd.adcreative_id = fad.adcreative_id
 LEFT JOIN zocket_global.fb_ads fa ON fa.ad_id = fad.ad_id
@@ -164,7 +164,7 @@ ad_id = st.text_input("Enter ad_id")
 
 st.dataframe(df[df["fad_ad_id"] == ad_id])
 
-filtered_df = df[['buid','bid','fad_ad_account_id','fad_campaign_id','fad_adset_id','fad_ad_id','fc_picture','fad_preview_shareable_link','fad_status','fad_effective_status','fad_ad_review_feedback','fcd_objective']]
+filtered_df = df[['buid','bid','fad_ad_account_id','fad_campaign_id','fad_adset_id','fad_ad_id','fc_picture','fad_preview_shareable_link','fad_status','fad_effective_status','fad_ad_review_feedback','fcd_objective','business_manager_id']]
 
 
 # Function to extract both components
@@ -193,7 +193,11 @@ filtered_df['Error'] = filtered_df['Error'].str.replace(r'[0-9\(\)\[\]\.{}]', ''
 
 st.dataframe(filtered_df)
 
-filtered_df = filtered_df[['buid','bid','fad_ad_account_id','fad_ad_id','fc_picture','fad_preview_shareable_link','fad_status','fad_effective_status','fad_ad_review_feedback','fcd_objective','Error','message']]
+filtered_df = filtered_df[['buid','bid','fad_ad_account_id','fad_ad_id','fc_picture','fad_preview_shareable_link','fad_status','fad_effective_status','fad_ad_review_feedback','fcd_objective','Error','message','business_manager_id']]
+
+filtered_df['fad_ad_account_id'] = filtered_df['fad_ad_account_id'].apply(lambda x: x.split('_')[1] if '_' in x else x)
+
+filtered_df['ad_acc_link']= filtered_df.apply(lambda row: f"https://adsmanager.facebook.com/adsmanager/manage/ads?act={row['fad_ad_account_id']}&business_id={row['business_manager_id']}&columns=name%2Cadgroup_id%2Cdelivery%2Crecommendations_guidance%2Ccampaign_name%2Cbid%2Cbudget%2Clast_significant_edit%2Cattribution_setting%2Cresults%2Creach%2Cimpressions%2Ccost_per_result%2Cquality_score_organic%2Cquality_score_ectr%2Cquality_score_ecvr%2Cspend%2Cend_time%2Cschedule&attribution_windows=default&filter_set=SEARCH_BY_ADGROUP_IDS-STRING_SET%1EANY%1E[%22{row['fad_ad_id']}%22]&selected_ad_ids={row['fad_ad_id']}&breakdown_regrouping=true&nav_source=no_referrer", axis=1)
 
 st.data_editor(
     filtered_df,
@@ -204,6 +208,11 @@ st.data_editor(
         "fad_preview_shareable_link": st.column_config.LinkColumn(
             "AD Preview",
             help="View the AD preview in Facebook"
+        ),
+
+        "ad_acc_link": st.column_config.LinkColumn(
+            "ad_acc_link",
+            help="View the AD in Facebook Ads Manager"
         )
         
     },
