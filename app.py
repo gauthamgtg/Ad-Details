@@ -122,7 +122,7 @@ FROM
 WHERE
     json_extract_path_text(json_extract_array_element_text(business_user_ids, 0), 'role') = 'owner' )bp on fcbm.app_business_id=bp.id
 where fad.ad_account_id in (SELECT distinct ad_account_id from zocket_global.fb_child_ad_accounts)
-and fad.created_date>=current_date-90
+and fad.created_date>=current_date-30
 )
     '''
 
@@ -224,9 +224,13 @@ st.data_editor(
     hide_index=True,
 )
 
-grouped_df = filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount')
+grouped_df = filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).agg({
+    'fad_ad_id': 'count'
+}).reset_index()
+grouped_df.columns = ['buid', 'fad_ad_account_id', 'Error', 'ErrorCount']
+grouped_df['fad_ad_id_count'] = grouped_df['ErrorCount']
 
-st.dataframe(filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount'))
+st.dataframe(grouped_df)
 
 
 grouped_df = filtered_df.groupby(['fad_updated_at','buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount')
