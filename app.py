@@ -224,13 +224,9 @@ st.data_editor(
     hide_index=True,
 )
 
-grouped_df = filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).agg({
-    'fad_ad_id': 'count'
-}).reset_index()
-grouped_df.columns = ['buid', 'fad_ad_account_id', 'Error', 'ErrorCount']
-grouped_df['fad_ad_id_count'] = grouped_df['ErrorCount']
+grouped_df = filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount')
 
-st.dataframe(grouped_df)
+st.dataframe(filtered_df.groupby(['buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount'))
 
 
 grouped_df = filtered_df.groupby(['fad_updated_at','buid', 'fad_ad_account_id', 'Error']).size().reset_index(name='ErrorCount')
